@@ -1,4 +1,5 @@
 # Load the data
+
 source("03_load_data.R")
 
 # Let's fit a simple random forest
@@ -13,3 +14,4 @@ for(i in 1:3) {
   fit.rf[[i]] <- ranger(Class ~ ., data = analysis(uci.iris.cv$splits[[i]]), probability = TRUE)
 }
 
+?ranger

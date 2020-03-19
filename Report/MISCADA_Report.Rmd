@@ -1,6 +1,6 @@
 ---
 title: "MISCADA Core IIA (3) Classification"
-author: "A. Student"
+author: "Jinjie Huang"
 date: "20 March 2020"
 output: pdf_document
 classoption: a4paper
@@ -22,13 +22,14 @@ An important aspect of the executive summary is reflecting on what the real-worl
 **Do not exceed 2 A4 pages after knitting to PDF for this section.**
 
 ## Part II: Technical summary
-
+### Initial data exploration
+### Details of any data coding or feature engineering;
 Write the technical details here.
 
 In this part you should describe how you approached the modelling problem and summarise the performance metrics for how well your final model performs in full technical detail.  The following list provides for some pointers to things you may want to think about addressing in this part:
 
-- initial data exploration;
-- details of any data coding or feature engineering;
+
+
 - any train/test/validate, cross-validation or bootstrap strategies employed;
 - strategies used to address any missingness;
 - the approach taken to model fitting, including any model design, early stopping criteria, hyperparameter selection or tuning, and algorithm choices;

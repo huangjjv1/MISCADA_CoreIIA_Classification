@@ -1,0 +1,454 @@
+
+# Have a general look on data
+```{r}
+library("data.table")
+library("mlr3verse")
+library("rsample")
+library("skimr")
+skim(adult)
+# pairs(adult)
+DataExplorer::plot_histogram(adult, ncol = 3)
+DataExplorer::plot_boxplot(adult, by = "salary", ncol = 3)
+```
+# To do the basic data analysis
+```{r}
+adult_tr = adult
+adult_tr$salary<-ifelse(adult_tr$salary==" <=50K",0,1)
+library(caret)
+## Loading required package: lattice
+## Loading required package: ggplot2
+
+dmy<-dummyVars("~.",data=adult_tr)
+adultsTrsf<-data.frame(predict(dmy,newdata=adult_tr))
+dim(adult_tr)
+dim(adultsTrsf)
+head(adultsTrsf)
+str(adultsTrsf)
+cor.prob<-function(X,dfr=nrow(X)-2){
+  R<-cor(X,use="pairwise.complete.obs")
+  above<-row(R)<col(R)
+  r2<-R[above]^2
+  Fstat<-r2*dfr/(1-r2)
+  R[above]<-1-pf(Fstat,1,dfr)
+  R[row(R)==col(R)]<-NA
+  R
+}
+
+flattenSquareMatrix<-function(m){
+
+  if((class(m) !="matrix") | (nrow(m) !=ncol(m))) stop("Must be asquare matrix.")
+  if(!identical(rownames(m),colnames(m))) stop("Row and column names must be equal.")
+  ut<-upper.tri(m)
+  data.frame(i=rownames(m)[row(m)[ut]],
+             j=rownames(m)[col(m)[ut]],
+             cor=t(m)[ut],
+             p=m[ut])
+}
+corMasterList<-flattenSquareMatrix(cor.prob(adultsTrsf))
+
+dim(corMasterList)
+corList<-corMasterList[order(-abs(corMasterList$cor)),]
+head(corList)
+selectedSub<-subset(corList,(abs(cor)>0.2 & j =="salary"))
+bestSub<-as.character(selectedSub$i[c(1,3,5,6,8,9)])
+library(psych)
+pairs.panels(adultsTrsf[c(bestSub,"salary")])
+
+```
+#KNN part
+```{r}
+# data splitting
+# adult$salary<-ifelse(adult$salary==" <=50K",0,1)
+# adult_test$salary<-ifelse(adult_test$salary==" <=50K",0,1)
+adult_knn = adult
+adult_test_knn = adult_test
+adult_knn[,label := rep("train",nrow(adult_knn))]
+adult_test_knn[,label := rep("test",nrow(adult_test_knn))]
+adult_total_data <- rbind(adult_knn,adult_test_knn,fill=  TRUE)
+str(adult_total_data)
+
+library(dplyr)
+library(caret)
+adult_total_data_part <- select(adult_total_data,workclass,marital_status,occupation,relationship,race,sex,native_country) 
+dummies <- dummyVars(~., data = adult_total_data_part, levelsOnly = FALSE, fullRank = TRUE)
+adult_total_data_unordered <- predict(dummies, newdata = adult_total_data_part) %>% as.data.frame()
+
+adult_total_data_part2 <- select(adult_total_data,age,education_num,capital_gain,capital_loss,hours_per_week)
+adult_total_data_numerical <- preProcess(adult_total_data_part2,method = "scale") %>% predict(.,adult_total_data_part2)
+
+library(stringr)
+adult_total_data_part3 <- select(adult_total_data,salary,label)
+adult_total_data_part3[,salary := gsub("[\\. ]","",salary)]
+adult_total_data_target <-adult_total_data_part3[,salary := factor(salary,levels = c("<=50K",">50K"),labels = c(0,1))]
+
+
+adult_total_data_final <- cbind(adult_total_data_target,adult_total_data_unordered,adult_total_data_numerical)
+adult_train_knn <- adult_total_data_final[label == "train",] %>% select(.,-label)
+adult_test_knn <- adult_total_data_final[label == "test",] %>% select(.,-label)
+library(class)
+library(pROC)
+
+#firstly use 10 to begin with
+adult_pre  <- knn(train = adult_train_knn[,-1],test = adult_test_knn[,-1],cl = adult_train_knn$salary,k= 10)
+auc <- auc(as.numeric(adult_test_knn$salary),as.numeric(adult_pre))
+auc
+# to find the best k value here
+temp = 0
+for (i in 2:20){
+  adult_pre  <- knn(train = adult_train_knn[,-1],test = adult_test_knn[,-1],cl = adult_train_knn$salary,k= i)
+  auc <- auc(as.numeric(adult_test_knn$salary),as.numeric(adult_pre))
+  if(auc >temp) {temp = auc;temp_k = i}
+  print(i)
+}
+
+plot(roc(as.numeric(adult_test_knn$salary),as.numeric(adult_pre)))
+auc <- auc(as.numeric(adult_test_knn$salary),as.numeric(adult_pre))
+print(paste("The best k is",temk_k,"and the auc value is:",auc))
+```
+
+
+
+```{r}
+
+library("randomForest")
+size_of_rf = 10000
+randomForest(adult[1:size_of_rf,]$salary~.,data = adult[1:size_of_rf,])
+```
+
+```{r}
+library("randomForest")
+n<-length(names(adult))     #计算数据集中自变量个数，等同n=ncol(train_data)
+rate=c()    #error rate list
+print(paste("Times is:",n-1))
+for(i in 1:(n-1)){
+  set.seed(1234)
+  rf_train<-randomForest(as.factor(adult$salary)~.,data=adult,mtry=i,ntree=1000)
+  rate[i]<-mean(rf_train$err.rate)   #calculate all the error rate based on OOB model
+  # print(rf_train)    
+}
+
+(rate)     #展示所有模型误判率的均值
+plot(rate)
+rf_train<-randomForest(as.factor(adult$salary)~.,data=adult,ntree=1000)
+plot(rf_train)
+```
+#Training randomForest model
+```{r}
+rf_train<-randomForest(as.factor(iris_train$type)~.,data=iris_train,ntree=300,proximity = TRUE)
+hist(treesize(rf_train))
+importance<-importance(rf_train) 
+barplot(rf_train$importance[,1],main="Importance of Input vaiables")
+
+```
+#Prediction
+```{r}
+pred<-predict(rf_train,newdata=iris_test)  
+pred_out_1<-predict(object=rf_train,newdata=iris_test,type="prob")
+table <- table(pred,iris_test$type)  
+sum(diag(table))/sum(table)  #预测准确率
+plot(margin(rf_train,iris_test$type))
+MDSplot(rf_train,fac = 3)
+```
+
+```{r}
+
+library(klaR)
+fit_Bayes1=NaiveBayes(type~.,iris_train)
+fit_Bayes1
+# head(fit_Bayes1)
+head(iris_test)
+pre_Bayes1=predict(fit_Bayes1,iris_test)
+pre_Bayes1$posterior
+```
+
+# We assume you remember what this data is like from previous labs!  If
+# not, go back and remind yourself before continuing.
+#
+# We first split the data into train/validate/test.  We won't do cross
+# validation here just because deep learning is the most computationally
+# expensive method we've looked at so far and we don't have the time in
+# the lab to wait for a full 5-fold cross validation to run.
+```{r}
+# adult$salary<-ifelse(adult$salary==" <=50K",0,1)
+# adult_test$salary<-ifelse(adult_test$salary==" <=50K."," <=50K"," >50K")
+library("data.table")
+library("mlr3verse")
+library("rsample")
+# First get the validate
+adult_split <- initial_split(adult)
+adult_split2 <- initial_split(testing(adult_split), 0.5)
+adult_validate <- training(adult_split2)
+```
+# The first thing we need to do is to transform the data into a form
+# which works with deep learning.
+#
+# - Every feature must be numeric;
+#
+# - use one-hot coding for categorical data;
+#
+# - there must be no missing values;
+#
+# - each feature should be normalised to mean zero, standard deviation 1
+# (or tranformed to the range [0,1])
+#
+# We use the recipies package to do this so you can see an alternative
+# to the pipelines from MLR3 which gives you more manual control.
+#
+# One of the special things about the recipies package is that it
+# enables computing the scaling factors on training data and to then use
+# this on validation and testing without having to keep the training
+# data around later on.  This is because it is *very* important that you
+# do not independently scale and centre the validation and testing
+# data!!  The act of scaling and centring is part of the analysis
+# pipeline and the mean and standard deviation estimated from training
+# data are effectively parameters of the ultimate model.
+```{r}
+library("recipes")
+
+cake <- recipe(salary ~ ., data = adult) %>%
+  step_meanimpute(all_numeric()) %>% # impute missings on numeric values with the mean
+  step_center(all_numeric()) %>% # center by subtracting the mean from all numeric features
+  step_scale(all_numeric()) %>% # scale by dividing by the standard deviation on all numeric features
+  step_unknown(all_nominal(), -all_outcomes()) %>% # create a new factor level called "unknown" to account for NAs in factors, except for the outcome (response can't be NA)
+  step_dummy(all_nominal(), one_hot = TRUE) %>% # turn all factors into a one-hot coding
+  prep(training = adult) # learn all the parameters of preprocessing on the training data
+
+adult_train_final <- bake(cake, new_data = adult) # apply preprocessing to training data
+adult_validate_final <- bake(cake, new_data = adult_validate) # apply preprocessing to validation data
+adult_test_final <- bake(cake, new_data = adult_test) # apply preprocessing to testing data
+```
+# Have a look at this data to see what has been done
+
+
+
+## Keras
+# Although MLR3 does have support for fitting deep learning models as
+# part of its pipeline, for the first time you use them we'd like to
+# have full control (and often you want more fine detail control when
+# fitting deep learning than is needed with classical ML methods).
+# Therefore we'll directly interface to Keras, a deep learning interface
+# developed by François Chollet from Google.
+```{r}
+library("keras")
+```
+# The lab server is already setup with Keras, but if you are running
+# this on your own machine then you may need to install it with the
+# command install_keras().  Please do NOT run that command on the lab
+# server as it will download gigabytes of data for every user
+# unnecessarily!
+
+# We have one more data preparation step to perform, because Keras
+# expects to receive the data in matrix form and wants the features and
+# responses separately
+```{r}
+adult_train_x <- adult_train_final %>%
+  select(-starts_with("salary_")) %>%
+  as.matrix()
+adult_train_y <- adult_train_final %>%
+  select("salary_X..50K") %>%
+  as.matrix()
+
+adult_test_x <- adult_test_final %>%
+  select(-starts_with("salary_")) %>%
+  as.matrix()
+adult_test_y <- adult_test_final %>%
+  select("salary_X..50K") %>%
+  as.matrix()
+
+adult_validate_x <- adult_validate_final %>%
+  select(-starts_with("salary_")) %>%
+  as.matrix()
+adult_validate_y <- adult_validate_final %>%
+  select("salary_X..50K") %>%
+  as.matrix()
+
+```
+
+```{r}
+head(adult_test_y,10)
+```
+
+
+```{r}
+# Ok, that looks like a bad idea!  Massive overfitting.
+
+# We'll learn in lectures we have methods that can combat this and still
+# allow fitting very deep neural networks:
+deep.net <- keras_model_sequential() %>%
+  layer_dense(units = 32, activation = "relu",
+              input_shape = c(ncol(adult_train_x))) %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 32, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 32, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 32, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 1, activation = "sigmoid")
+```
+
+```{r}
+# Have a look at it
+deep.net
+```
+
+```{r}
+deep.net %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = optimizer_rmsprop(),
+  metrics = c("accuracy")
+)
+
+deep.net %>% fit(
+  adult_train_x, adult_train_y,
+  epochs = 50, batch_size = 32,
+  validation_data = list(adult_validate_x, adult_validate_y),
+)
+```
+
+```{r}
+# To get the probability predictions on the test set:
+pred_test_prob <- deep.net %>% predict_proba(adult_test_x)
+
+# To get the raw classes (assuming 0.5 cutoff):
+pred_test_res <- deep.net %>% predict_classes(adult_test_x)
+
+# Confusion matrix/accuracy/AUC metrics
+# (recall, in Lab03 we got accuracy ~0.80 and AUC ~0.84 from the super learner,
+# and around accuracy ~0.76 and AUC ~0.74 from best other models)
+table(pred_test_res, adult_test_y)
+yardstick::accuracy_vec(as.factor(adult_test_y),
+                        as.factor(pred_test_res))
+yardstick::roc_auc_vec(as.factor(adult_test_y),
+                       c(pred_test_prob))
+```
+
+
+```{r}
+# In practice you would want to now do a careful exercise in cross-validation
+# searching over architectures and regularisation schemes, also investigating
+# the optimiser options.  See lectures for more discussion of this.
+#
+# For now, it is more important we see how to build a more complex deep neural
+# network example.
+#
+# We revisit the MNIST handwriting example from Lab 2.  Download (if needed)
+# and read the data.
+download.file("http://www.louisaslett.com/Courses/MISCADA/mnist.fst", "mnist.fst")
+mnist <- fst::read.fst("mnist.fst")
+
+# Recall this code allows you to look at any image
+library("tidyverse")
+
+plotimages <- function(i) {
+  imgs <- mnist %>%
+    slice(i) %>%
+    mutate(image.num = i) %>%
+    pivot_longer(x0.y27:x27.y0,
+                 names_to = c("x", "y"),
+                 names_pattern = "x([0-9]{1,2}).y([0-9]{1,2})",
+                 names_ptypes = list(x = integer(), y = integer()),
+                 values_to = "greyscale")
+
+  ggplot(imgs, aes(x = x, y = y, fill = greyscale)) +
+    geom_tile() +
+    scale_fill_gradient(low = "white", high = "black") +
+    facet_wrap(~ image.num + response, labeller = label_both)
+}
+
+plotimages(21:24)
+```
+
+# We are going to fit a convolutional neural network to this data.  We need
+# to put this in tensor form to work with Keras.  So this is now a
+# "three-dimensional matrix" with indices [image,x pixel,y pixel]
+```{r}
+mnist_tensor <- array(c(as.matrix(mnist[,-1][784:1])), dim = c(60000,28,28))
+mnist_tensor <- mnist_tensor[,28:1,] # this corrects the mirrored x-axis from the original import
+```
+
+```{r}
+# We can use a simple base R to plot any image we want.  Change the 5 below to
+# any other value from 1 to 60000 to view it
+image(1:28, 1:28, mnist_tensor[5,,])
+```
+
+```{r}
+# In fact, Keras expects colour channels, so for a greyscale image we must add
+# an 'empty' dimension to make it a 4D tensor
+dim(mnist_tensor) <- c(60000,28,28,1)
+
+```
+
+```{r}
+# The values are already mixed, so we take the first 40000 as training, and
+# 10000 each of validation and testing
+#
+# We divide by 255 to get in the scale [0,1]
+# We use class.ind rather than a whole recipie as we only need to create one-hot
+# coding and no other pre processing pipeline
+# The drop=FALSE prevents the 'empty' dimension being dropped
+mnist_train_x <- mnist_tensor[1:40000,,,,drop=FALSE]/255
+mnist_train_y <- nnet::class.ind(mnist[1:40000,1])
+
+mnist_val_x <- mnist_tensor[40001:50000,,,,drop=FALSE]/255
+mnist_val_y <- nnet::class.ind(mnist[40001:50000,1])
+
+mnist_test_x <- mnist_tensor[50001:60000,,,,drop=FALSE]/255
+mnist_test_y <- nnet::class.ind(mnist[50001:60000,1])
+
+
+# Now we create a neural network suited to image type classification problems
+# See lectures
+deep.net <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3,3), activation = 'relu',
+                input_shape = c(28,28,1)) %>%
+  layer_conv_2d(filters = 64, kernel_size = c(3,3), activation = 'relu') %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_dropout(rate = 0.25) %>%
+  layer_flatten() %>%
+  layer_dense(units = 64, activation = 'relu') %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 10, activation = 'softmax')
+
+deep.net %>% compile(
+  loss = "categorical_crossentropy",
+  optimizer = optimizer_rmsprop(),
+  metrics = c("accuracy")
+)
+```
+
+```{r}
+# We should train for more epochs but don't want lab machine to go too slow!
+# Try improving on this in your own time
+deep.net %>% fit(
+  mnist_train_x, mnist_train_y,
+  batch_size = 32,
+  epochs = 5,
+  validation_data = list(mnist_val_x, mnist_val_y)
+)
+
+pred <- deep.net %>% predict_classes(mnist_test_x)
+# Confusion matrix/accuracy
+table(pred, max.col(mnist_test_y)-1)
+yardstick::accuracy_vec(as.factor(max.col(mnist_test_y)-1),
+                        as.factor(pred))
+
+# Have a look at an image it got wrong ... change the i variable to see others
+wrong <- which(pred != max.col(mnist_test_y)-1)
+i <- 1
+image(mnist_test_x[wrong[i],,,1],
+      main = glue::glue("Truth: {(max.col(mnist_test_y)-1)[wrong[i]]}, Predicted: {pred[wrong[i]]}"))
+
+# How would a random forest have done?
+rf <- ranger::ranger(as.factor(response) ~ ., mnist[1:40000,])
+predrf <- predict(rf, mnist[50001:60000,])
+# Confusion matrix/accuracy
+table(predrf$predictions, max.col(mnist_test_y)-1)
+yardstick::accuracy_vec(as.factor(max.col(mnist_test_y)-1),
+                        predrf$predictions)
+```
