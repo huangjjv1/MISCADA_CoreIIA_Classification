@@ -1,7 +1,6 @@
 
 # Have a general look on data
 ```{r}
-source("03_load_data.R")
 library("data.table")
 library("mlr3verse")
 library("rsample")
@@ -91,7 +90,7 @@ adult_test_knn <- adult_total_data_final[label == "test",] %>% select(.,-label)
 library(class)
 library(pROC)
 
-find_k_rows= 10000
+find_k_rows= 1000
 #firstly use 10 to begin with
 adult_pre  <- knn(train = adult_train_knn[1:find_k_rows,-1],test = adult_test_knn[1:find_k_rows,-1],cl = adult_train_knn$salary[1:find_k_rows],k= 1)
 auc <- auc(as.numeric(adult_test_knn[1:find_k_rows]$salary),as.numeric(adult_pre))
@@ -106,8 +105,6 @@ for (i in 1:20){
 }
 temp
 temp_k
-adult_pre  <- knn(train = adult_train_knn[1:find_k_rows,-1],test = adult_test_knn[1:find_k_rows,-1],cl = adult_train_knn$salary[1:find_k_rows],k=temp_k)
-
 plot(roc(as.numeric(adult_test_knn$salary[1:find_k_rows]),as.numeric(adult_pre)))
 auc_knn <- auc(as.numeric(adult_test_knn$salary[1:find_k_rows]),as.numeric(adult_pre))
 print(paste("The best k is",temp_k,"and the auc value is:",temp))
@@ -214,7 +211,7 @@ deep.net %>% compile(
 
 deep.net %>% fit(
   adult_train_x, adult_train_y,
-  epochs = 64, batch_size = 50,
+  epochs = 20, batch_size = 50,
   validation_data = list(adult_validate_x, adult_validate_y),
 )
 ```
@@ -336,7 +333,7 @@ library("rsample")
 library(pROC)
 pred<-predict(rf_train,newdata=adult_test)  
 pred_out_1<-predict(object=rf_train,newdata=adult_test,type="prob")
-table = table(pred,adult_test$salary) 
+table(pred,adult_test$salary) 
 auc_rf <- auc(as.numeric(adult_test$salary),as.numeric(pred))
 auc_rf
 sum(diag(table))/sum(table)  #accuracy

@@ -13,34 +13,96 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Part I: Executive summary
 
-Write your executive summary here.
+Executive Summary  
+https://github.com/huangjjv1/MISCADA_CoreIIA_Classification
+1)	Data introduction & Objectives
+We are researching what factors are most relevant to people's salary. We can finally know through the results which aspects of a person should be improved or should be valued to increase their income. This analysis can be submitted to the government as a basis for guiding public spending, while increasing social productivity. Similarly, if we have the features of a person, then we can predict the approximate range of his/her salary expectation.
+Through the research, we have a set of data containing about 32500 personal samples. Each sample is about the information of persons in 15 kinds of features including Age, WorkClass, numerical id, Education (degree) 5. EducationNumber (years a person has been educated) 6. Martial Status 7. Occupation 8. Relationship 9. Race 10. Gender 11. CapitalGain 12. CapitalLoss 13. HoursWeek 14. NativeCountry 15. Income.
+The problem is binary classification because we only focus on whether a person’s annual salary reach 50k/year.
+2)	Modelling & Implement Strategy
+We now have proposed 3 methods of analysis: 
+1.	deep learning: It has more flexibility to process a large amount of data. However, it calls for high computer hardware requirements. That makes it an algorithm with the highest upper limit and the highest cost.
+2.	KNN: Does not require training costs and has high stability of output in accuracy, but is not compatible with all different data. 
+3.	random forest: It is possible to extract the importance of each feature through certain feature analysis, which has strong interpretability. Only a small amount of data preparation is needed to process both categorical and numerical data. Besides it also has good stability and reliability.
+3)	Result Analysis & Interpretable part
+Through Initial data exploration, we can get the correlation between every two dominant features. We can observe their common changes, trends, whether there is a common increase or decrease. According to our intuitive experience, wages should be related to the industry in which they are located, that is, the type of work. And the level of work, which can be consider as the working age. According to correlation analysis we find that, the higher the education numbers, working age, working hours per week, the higher the salary. Married persons and those are in executive positions earn more than those are not, which is quite interesting.
+ 
+Fig. 1 Importance of each feature
 
-In this part you should describe the modelling problem being addressed with this data set, the results of your analysis and any performance metrics in terms that would be easy for a non-expert to understand.  This means you will need to *avoid* reporting figures such as AUC, true positive rate, etc and should instead provide tangible performance numbers and easily interpretable plots: imagine you are handing this to your line manager in a future job.
+From the figure above we can conclude that age, years of education time, marital status, occupation, relationship, capital gain and work hours per week are the more important features of persons that can decide their salary levels. It is worth mentioning that gender and race are not very distinct from other factors. It also helps reduce racial and gender discrimination in workplace culture. 
+The importance information we got here is just the target we want. However, we can still do the predictions by training models to discover the potential of the data.
+4)	Predictions	
+Through a series of data processing, we have extracted the main features. We now can train the models using these observations with those several features. After training models with machine learning, cart, random forest and KNN algorithms, we finally confirm the random forest is the ideal model we want. The stability and understandability of the random forest in the selection of the model play an outstanding role in this analysis.
+The accuracy rate we obtained through prediction can exceed 85%. The stability and understandability of the random forest plays an outstanding role in this analysis. We have not only analyzed the important factors, but also made predictions on the test samples provided. That is to say, we have achieved and met the expected results. It can be expected that the analysis of this data will play a key role in future human resources and social issues
 
-An important aspect of the executive summary is reflecting on what the real-world objective may be in relation to the data set you are using and how your analysis addresses it.  For example, if it is a medical dataset, is raw accuracy really the best objective to optimise?  If not, what is the real objective and how have you addressed it?  Feel free to be creative here if necessary to define an interesting question (eg set economic values on different ground truth/prediction outcomes).
 
 **Do not exceed 2 A4 pages after knitting to PDF for this section.**
 
 ## Part II: Technical summary
-### Initial data exploration
-### Details of any data coding or feature engineering;
-Write the technical details here.
 
-In this part you should describe how you approached the modelling problem and summarise the performance metrics for how well your final model performs in full technical detail.  The following list provides for some pointers to things you may want to think about addressing in this part:
+### 1) Initial data exploration
 
+First, we can have a general look at the original data and see the correlation between continous variables
+```{r,echo=FALSE}
+library(data.table)
+library("skimr")
+adult <- data.table(readRDS("../Data/adult.rds"))
+# par(mfrow = c(1,2))
+# plot(1:10)
+# plot(1:10)
+skim(adult)
+DataExplorer::plot_boxplot(adult, by = "salary", ncol = 3)
+DataExplorer::plot_intro(adult)
+DataExplorer::plot_correlation(adult)
+```
+We can see, 0% missing in all columns, and 38% of the statistics are continuous, which means we can make a boxplot by the 
+different level of salary (>50K or not).
 
+### 2) Details of any data coding or feature engineering
 
-- any train/test/validate, cross-validation or bootstrap strategies employed;
-- strategies used to address any missingness;
-- the approach taken to model fitting, including any model design, early stopping criteria, hyperparameter selection or tuning, and algorithm choices;
-- insights into improvements achieved through different architectures (deep learning), data augmentation approaches, regularisation methods, etc;
-- details on the performance of the model, including calibration;
-- reporting of loss function choices, any post-model analysis such as tuning true/false positive rates, and justification of alternative objective functions;
-- any efforts at interpretability of models;
-- supporting plots for any of the above points.
+Column names: The adult data has 32560 observations and 15 features per observation. Features are respectively: 1. Age 2. WorkClass 3. Final weight (a special id of each observation) 4. Education (degree) 5. EducationNumber (years a person has been educated) 6. MartialStatus 7. Occupation 8. Relationship 9. Race 10.Sex 11. CapitalGain 12. CapitalLoss 13. HoursWeek 14. NativeCountry 15. Income. 
+              Fig. 3 Correlations among features
+Feature engineering: Three features of variables have suspicious high correlations. We can consider the id (feature 3) of each observation is a random value, so we can remove it from the columns; The education years can be considered to show the similar meaning of education degree, so we also remove the education_nums from the columns. Thus, we have 12 features working as variables, and salary conditions as response. 
 
-Do *not* include any code snippets in the written report, since code must be submitted separately anyhow.
+### 3) Train/test/validate splitting
 
-**Do not exceed 4 A4 pages after knitting to PDF for this section.**
+The training set is used to train the model parameters, the test set is used to estimate the generalization error of the model on the sample, and the validation set is used to get the fit hyperparameters of the model. In this case, validation set is from the other half of the raw data. Test set has already been given. So, we just use it.
 
-**Do not exceed 6 A4 pages after knitting to PDF for the report as a whole.**
+### 4) Strategies used to address any missingness;
+
+Although the figure in the first section shows that the NA rate is 0, it is actually not 0 but very close to 0. In addition, NA only emerges in non-continuous features. That is to say, the ratio is small enough that we can give NA a specific given value. In Deep Learning model, the strategy here we implement is to set them to unknown feature, and this will not affect too much on the result according repeated tests. While in Random Forest model we use Median of corresponding column (na.action = na.roughfix).
+
+### 5) the approach taken to model fitting, including any model design, early stopping criteria, hyperparameter selection or tuning, and algorithm choices;
+
+To be able to analyse data at multiple levels, we carry out KNN, random forest, and deep learning algorithms to do the analysis. Deep Learning: 1) As we know that if the layers are not configured properly (especially when setting up the network without dropout layer), overfitting may appear. To tune the hyperparameter, we can observe that after about 20-30 epochs, the val_loss get higher obviously or stable. So, I take the best performance (generalization error) during early stopping epoch; 
+Random Forest: I mainly tune the number of variables randomly sampled as candidates at each split. After several tests the trend emerges, The mtry best is 3. Then, the error rate (using OOB estimate) can be the lowest: 0.18.
+          Fig. 4 Random forest error
+KNN: Tune the k value, and it turns out to be 1 with auc value 0.9944 (This value is doubtfully high). We mainly discuss Deep Learning and Random Forest method.
+
+### 6) insights into improvements achieved through different architectures (deep learning), data augmentation approaches, regularisation methods, etc;
+
+Machine Learning architectures: A basic of combination of layers consists of one density layer (using relu activation function to complete a non-linear function transformation on the input data), one normalization layer and a dropout layer. The first one is where parameter and corresponding loss function values are at; The second one is to normalize its activation value to a normal distribution with a mean of 0 and a variance of 1. The last one is the so-called dropout layer. It let the activation value of a certain neuron stop working with a certain probability p, which can make the model more general, because it will not rely too much on some local features. Especially if the model has too many parameters and too few training samples, the trained model is prone to overfitting. It is worth mentioning that DNN is trained batch by batch. The first reason is to better deal with non-convex loss functions. In the case of non-convex, even if the full sample is calculated, it will be stuck on the local optimization. The batch indicates the partial sampling of the full sample, which is equivalent to artificially introducing correction sampling noise on the gradient. That makes it more likely that all the way to find another way to search for the optimal value; the second is to reasonably use the memory capacity. So, when we nest multiple combination of these layers to the network, we simultaneously adjust the batch size to increase the calculation efficiency and the fitting performance.
+
+### 7) Details on the performance of the model, including calibration;
+
+We need calibration when doing online model evaluation. We will decide whether to do calibration based on predict data and real feedback.
+
+Performance of Deep Learning and Random Forest:
+   
+
+Fig. 5 simple DNN. Tuned DNN and confusion matrix of DNN
+  
+Fig. 6 Performance plot and confusion matrix of RandomForest 
+
+Area under the curve: 0.7812 (DNN) and 0.8949 (RandomForest). 
+DNN: Loss function is set to be binary cross-entropy because it is a binary classification; optimizer is set to Rmsprop, which tries to solve the problem that the gradient may vary greatly in amplitude. Some gradients may be small, while others may be large, which can cause a very tricky problem-trying to find a single overall learning rate for the algorithm. If we use full batch learning, we can use only gradient symbols to solve this problem. In this way, we can guarantee that the size of the weight update is the same. This adjustment helps to greatly solve the saddle point and stationary problems, and we can take large enough steps even with small gradients. Metrics uses accuracy
+### 8) Any efforts at interpretability
+Considering that this is not a network like convolutional neural network, it is difficult to perform interpretable processing in neural networks. The actual meaning of the node parameters is difficult to have an intuitive reflection and dimensionality reduction processing. So, in order to give non-scientific background readers an intuitive understanding of the model, through the establishment of a random forest model and the use of the Gini algorithm, we can get the weight (importance) of each feature
+  
+Fig. 7 Importance of each feature
+
+From the figure above we can conclude that age, years of education time, marital status, occupation, relationship, capital gain and work hours per week are the more important features of persons that can decide their salary levels.
+
+### 9)	Conclusion
+
+Overall, random forest is more accurate and more interpretable for binary classification models, which can be reflected from the auc value. Deep learning has the disadvantages of training models, optimizing models, and resource consumption. However, it may have more advantages in the establishment of more multi-dimensional and models and general optimization. In general, for this binary classification problem, random forest is the more appropriate model to choose.

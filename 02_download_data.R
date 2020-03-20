@@ -9,6 +9,18 @@ adult_test <- data.table(read.csv("./adult.test"))
 
 library("dplyr")
 library("forcats")
+library("data.table")
+library("mlr3verse")
+library("rsample")
+library(pROC)
+library("skimr")
+library(caret)
+library(psych)
+library("recipes")
+library("keras")
+library("randomForest")
+library(dplyr)
+library(class)
 
 # update the class labels to be shorter
 names(adult)<- c("age","workclass","fnlwgt","education","education_num","marital_status",
